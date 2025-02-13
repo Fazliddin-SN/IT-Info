@@ -9,9 +9,12 @@ export const artcileServices = {
       const newArticle = await Article.create({ ...data });
 
       if (!newArticle) {
-        throw new ApiError(400, "Can not create!");
+        return {
+          ok: false,
+          status: 400,
+          message: "Can not create!",
+        };
       }
-
       await newArticle.save();
       //   await newArticle
       //     .populate("category_id", "name description")
@@ -42,8 +45,13 @@ export const artcileServices = {
       const articles = await Article.find().skip(offset).limit(limit);
 
       if (!articles || articles.length === 0) {
-        throw new ApiError("can not find articles");
+        return {
+          ok: fasle,
+          status: 404,
+          message: "can not find articles",
+        };
       }
+
       return {
         ok: true,
         data: articles,
@@ -60,11 +68,11 @@ export const artcileServices = {
   async getById(id) {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new ApiError(400, "Invalid id");
+        return { ok: false, status: 400, message: "Invalid id" };
       }
       const article = await Article.findById(id);
       if (!article) {
-        throw new ApiError(404, "Article not found!");
+        return { ok: false, status: 404, message: "Article not found!" };
       }
       return {
         ok: true,
@@ -82,7 +90,7 @@ export const artcileServices = {
   async update(id, newData) {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new ApiError(400, "Invalid id");
+        return { ok: false, status: 400, message: "Invalid id" };
       }
 
       const updatedArticle = await Article.findByIdAndUpdate(
@@ -93,7 +101,7 @@ export const artcileServices = {
         { new: true }
       );
       if (!updatedArticle) {
-        throw new Error("Can not find and update. Please try again!");
+        return { ok: false, status: 404, message: "Can not find and update!" };
       }
       return {
         ok: true,
@@ -112,7 +120,7 @@ export const artcileServices = {
   async delete(id) {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) {
-        throw new Error("Invalid id");
+        return { ok: false, status: 400, message: "Invalid id" };
       }
       await Article.findByIdAndDelete(id);
       return {

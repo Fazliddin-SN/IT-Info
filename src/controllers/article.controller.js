@@ -7,6 +7,12 @@ export const articleControllers = {
   create: catchAsync(async (req, res) => {
     const body = req.body;
     const data = await artcileServices.create(body);
+    // make sure everything
+    if (!data.ok) {
+      return res.status(data.status).json({
+        message: data.message,
+      });
+    }
     res.status(200).json({
       message: "article created!",
       data: data.data,
@@ -21,7 +27,13 @@ export const articleControllers = {
     // calculate the offset based on page number and limit
     const offset = (page - 1) * limit;
     const articles = await artcileServices.getArticles(limit, offset);
-    console.log(articles);
+    // check if there is no error
+    if (!articles.ok) {
+      return res.status(data.status).json({
+        message: data.message,
+      });
+    }
+    // console.log(articles);
 
     res.status(200).json({
       data: articles.data,
@@ -32,7 +44,7 @@ export const articleControllers = {
     const { id } = req.params;
     const article = await artcileServices.getById(id);
     if (!article.ok) {
-      return res.status(400).json({
+      return res.status(article.status).json({
         message: article.message,
       });
     }
@@ -46,7 +58,7 @@ export const articleControllers = {
     const body = req.body;
     const data = await artcileServices.update(id, body);
     if (!data.ok) {
-      return res.status(404).json({
+      return res.status(data.status).json({
         message: data.message,
       });
     }
@@ -59,7 +71,7 @@ export const articleControllers = {
     const { id } = req.params;
     const data = await artcileServices.delete(id);
     if (!data.ok) {
-      return res.status(400).json({
+      return res.status(data.status).json({
         message: data.message,
       });
     }

@@ -8,42 +8,72 @@ import { ApiError } from "../utils/errorHandler/ApiError.js";
 export const authService = {
   //REGISTER
   async register(userData) {
-    // hashing the password
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
+    try {
+      // hashing the password
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
 
-    const user = await User.create({ ...userData, password: hashedPassword });
-    // generate otp
-    const otp = otpGenerator.generate(6, {
-      digits: true,
-      lowerCaseAlphabets: false,
-      upperCaseAlphabets: false,
-      specialChars: false,
-    });
-    // send otp to user email
-    sendMail(user.email, `This is your OTP: ${otp}`);
-    // save it in otp model
-    const currentOtp = await Otp.create({ code: otp, user_id: user._id });
-    currentOtp.save();
-    return user;
+      const user = await User.create({ ...userData, password: hashedPassword });
+      if (!user) {
+        return {
+          ok: false,
+          sts: 400,
+          msg: "Can not regitser. Something went wrong!",
+        };
+      }
+      // generate otp
+      const otp = otpGenerator.generate(6, {
+        digits: true,
+        lowerCaseAlphabets: false,
+        upperCaseAlphabets: false,
+        specialChars: false,
+      });
+      // send otp to user email
+      sendMail(user.email, `This is your OTP: ${otp}`);
+      // save it in otp model
+      const currentOtp = await Otp.create({ code: otp, user_id: user._id });
+      currentOtp.save();
+      return {
+        sts: 201,
+        ok: true,
+        msg: "registered",
+        data: user,
+      };
+    } catch (error) {
+      console.log("error: ", error.message);
+      return {
+        ok: false,
+        sts: 500,
+        msg: error.message,
+      };
+    }
   },
   async login(email, password) {
     const user = await User.findOne({ email });
     if (!user) {
-      throw new ApiError(STATUS_CODES.NOT_FOUND, ERROR_MESSAGES.NOT_FOUND);
+      return {
+        ok: false,
+        sts: 404,
+        msg: "Can not find user. Something went wrong!",
+      };
     }
     // console.log(user.password);
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      throw new ApiError(
-        STATUS_CODES.UNAUTHORIZED,
-        ERROR_MESSAGES.INVALID_CREDENTIALS
-      );
+      return {
+        ok: false,
+        sts: STATUS_CODES.UNAUTHORIZED,
+        msg: ERROR_MESSAGES.INVALID_CREDENTIALS,
+      };
     }
     /// check if user verified
     if (user.isActive !== "active") {
-      throw new ApiError(400, "You must be verified");
+      return {
+        ok: false,
+        msg: "You must be verified",
+        sts: 400,
+      };
     }
 
     const payload = {
@@ -65,17 +95,23 @@ export const authService = {
       expires_at: "3d",
     });
 
-    return { refreshToken, accessToken };
+    return {
+      ok: true,
+      sts: 200,
+      refreshToken,
+      accessToken,
+    };
   },
 
   refreshToken: async (refreshToken) => {
     try {
       // make sure refresh token is provided
       if (!refreshToken) {
-        throw new ApiError(
-          STATUS_CODES.UNAUTHORIZED,
-          "No refresh token is provided!"
-        );
+        return {
+          sts: STATUS_CODES.UNAUTHORIZED,
+          msg: "No refresh token is provided!",
+          ok: false,
+        };
       }
 
       // get decoded info
@@ -102,28 +138,54 @@ export const authService = {
         expiresIn: "1h",
       });
 
-      return newAccessToken;
+      return {
+        ok: true,
+        sts: 200,
+        newAccessToken,
+      };
     } catch (error) {
       console.log({ message: error.message });
+      return {
+        ok: false,
+        msg: error.message,
+        sts: 500,
+      };
     }
   },
   async verifOtp(userId, enteredOtp) {
     // console.log("userId: ", userId);
+    try {
+      const otp = await Otp.findOne({ code: enteredOtp });
+      // console.log("otp: ", otp);
 
-    const otp = await Otp.findOne({ code: enteredOtp });
-    // console.log("otp: ", otp);
+      if (!otp) {
+        return {
+          sts: 401,
+          msg: "Invalid or expired OTP",
+          ok: false,
+        };
+      }
+      // console.log("enteredOtp: ", enteredOtp);
+      // console.log("code: ", otp.code);
 
-    if (!otp) {
-      throw new ApiError(401, "Invalid or expired OTP");
+      if (otp.code !== enteredOtp) {
+        return {
+          sts: 400,
+          msg: "Incorrect otp!",
+          ok: false,
+        };
+      }
+      await User.findByIdAndUpdate(userId, { $set: { isActive: "active" } });
+      ///
+      await Otp.deleteOne({ _id: otp._id });
+      return { ok: true, sts: 200, message: "OTP verified successfully" };
+    } catch (error) {
+      console.log("error: ", error.message);
+      return {
+        ok: false,
+        sts: 500,
+        msg: error.message,
+      };
     }
-    // console.log("enteredOtp: ", enteredOtp);
-    // console.log("code: ", otp.code);
-
-    if (otp.code !== enteredOtp) {
-      throw new ApiError(400, "Incorrect OTP");
-    }
-    await User.findByIdAndUpdate(userId, { $set: { isActive: "active" } });
-    await Otp.deleteOne({ _id: otp._id });
-    return { success: true, message: "OTP verified successfully" };
   },
 };

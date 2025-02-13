@@ -7,6 +7,12 @@ export const authControllers = {
   signUp: catchAsync(async (req, res) => {
     const user = await authService.register(req.body);
 
+    if (!user.ok) {
+      return res.status(user.sts).json({
+        msg: user.msg,
+        data: user.data,
+      });
+    }
     res.status(201).json({
       message: "Registered!",
       data: user,
@@ -17,20 +23,33 @@ export const authControllers = {
     // get token
     const { email, password } = req.body;
     const token = await authService.login(email, password);
+
+    if (!token.ok) {
+      return res.status(token.sts).json({
+        message: token.msg,
+      });
+    }
     // console.log(token);
 
-    res.status(200).json({
-      token: token,
+    res.status(token.sts).json({
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
     });
   }),
   // REFRESH TOKEN
   refreshToken: catchAsync(async (req, res) => {
     const { refreshToken } = req.body;
     const accessToken = await authService.refreshToken(refreshToken);
-    console.log("access: ", accessToken);
 
-    res.status(200).json({
-      accessToken: accessToken,
+    if (!accessToken.ok) {
+      return res.status(accessToken.sts).json({
+        message: accessToken.msg,
+      });
+    }
+    // console.log("access: ", accessToken);
+
+    res.status(accessToken.sts).json({
+      accessToken: accessToken.newAccessToken,
     });
   }),
   verifyOTP: catchAsync(async (req, res) => {
@@ -40,10 +59,12 @@ export const authControllers = {
     const otpData = await authService.verifOtp(body.userId, body.otp);
     // console.log("otpdata: ", otpData);
 
-    if (!otpData.success) {
-      throw new ApiError(400, "Otp is not verified.Try one more!");
+    if (!otpData.ok) {
+      return res.status(400).json({
+        message: otpData.msg,
+      });
     }
-    res.status(200).json({
+    res.status(otpData.sts).json({
       message: otpData.message,
     });
   }),
