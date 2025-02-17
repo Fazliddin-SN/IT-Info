@@ -10,7 +10,6 @@ export const authControllers = {
     if (!user.ok) {
       return res.status(user.sts).json({
         msg: user.msg,
-        data: user.data,
       });
     }
     res.status(201).json({
